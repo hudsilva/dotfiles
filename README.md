@@ -5,6 +5,7 @@
 - [ ] Use Flakes
 - [ ] Xmonad Setup
 - [ ] Postgres setup
+- [ ] change `ext4` to `zfs`
 
 ## Tips
 
