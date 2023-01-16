@@ -422,7 +422,7 @@ in
     rebar3
 
     # postgres
-    postgresql_15
+    # postgresql_15
 
     # rust
     llvm
@@ -473,6 +473,9 @@ in
     gnomeExtensions.resource-monitor
     gnomeExtensions.mpris-label
     gnomeExtensions.no-activities-button
+
+    # steam
+    steam
   ];
 
   # fonts
@@ -513,15 +516,15 @@ in
   # services.fprintd.enable = true;
 
   # postgres
-  services.postgresql = {
-    enable = true;
-    authentication = pkgs.lib.mkForce "host all all 127.0.0.1/32 trust";
-    ensureUsers = [
-      {  name = "hudson";
-         ensurePermissions = { "ALL TABLES IN SCHEMA public" = "ALL PRIVILEGES"; };
-      }
-    ];
-  };
+  # services.postgresql = {
+  #   enable = true;
+  #   authentication = pkgs.lib.mkForce "host all all 127.0.0.1/32 trust";
+  #   ensureUsers = [
+  #     {  name = "hudson";
+  #        ensurePermissions = { "ALL TABLES IN SCHEMA public" = "ALL PRIVILEGES"; };
+  #     }
+  #   ];
+  # };
 
   # docker
   virtualisation.docker = {
@@ -529,6 +532,15 @@ in
     autoPrune.enable = true;
     enableOnBoot = false;
   };
+
+  # steam service config
+  programs.steam = {
+    enable = true;
+    remotePlay.openFirewall = true; # Open ports in the firewall for Steam Remote Play
+    dedicatedServer.openFirewall = true; # Open ports in the firewall for Source Dedicated Server
+  };
+  # Steam Proton Config
+  systemd.extraConfig = "DefaultLimitNOFILE=1048576";
 
   # Open ports in the firewall.
   # networking.firewall.allowedTCPPorts = [ ... ];
