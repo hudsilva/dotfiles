@@ -2,7 +2,7 @@
 # your system.  Help is available in the configuration.nix(5) man page
 # and in the NixOS manual (accessible by running ‘nixos-help’).
 
-{ config, pkgs, ... }:
+{ config, pkgs, lib, ... }:
 let
   nvidia-offload = pkgs.writeShellScriptBin "nvidia-offload" ''
     export __NV_PRIME_RENDER_OFFLOAD=1
@@ -16,11 +16,8 @@ in
   imports =
     [ # Include the results of the hardware scan.
       <nixos-hardware/dell/xps/15-9500>
-      #<nixos-hardware/common/gpu/nvidia/prime.nix> 
       ./hardware-configuration.nix
-      ./luks-devices-configuration.nix
       ./starship.nix
-      #./emacs.nix
     ];
 
   # nix flakes
@@ -29,11 +26,7 @@ in
     extraOptions = "experimental-features = nix-command flakes";
   };
 
-  # try using overlays
-  #nixpkgs.overlays = [ (import ./packages) ];
-
-  # emacs
-  services.emacs.package = pkgs.emacsUnstable;
+  # overlays
   nixpkgs.overlays = [
     (import ./packages)
     (import (builtins.fetchTarball {
@@ -41,20 +34,25 @@ in
     }))
   ];
 
-  services.emacs.enable = false;
-  services.emacs.install = true;
-
   # allow unfree/broken software
   nixpkgs.config.allowBroken = true;
   nixpkgs.config.allowUnfree = true;
 
-  # Use the systemd-boot EFI boot loader.
+  # Use the grub
   boot.loader.efi.canTouchEfiVariables = true;
   boot.loader.grub = {
     enable = true;
     version = 2;
     efiSupport = true;
     device = "nodev";
+  };
+
+  # setup luks
+  boot.initrd.luks.devices = {
+    crypted = {
+      device = "/dev/disk/by-uuid/92d84092-65a1-4de0-b837-5bdb2543c06a";
+      preLVM = true;
+    };
   };
 
   # plymouth config
@@ -69,23 +67,15 @@ in
   boot.consoleLogLevel = 0;
   boot.initrd.verbose = false;
 
-  
   # kernel params
-   boot.kernelParams = [
-     "loglevel=3" "quiet" "nouveau.modeset=0" "ibt=off" "vt.global_cursor_default=0"
+  boot.kernelParams = [
+    "loglevel=3" "quiet" "nouveau.modeset=0" "ibt=off" "vt.global_cursor_default=0"
   ];
 
   # networking.hostName = "nixos"; # Define your hostname.
   # Pick only one of the below networking options.
   # networking.wireless.enable = true;  # Enables wireless support via wpa_supplicant.
   # networking.networkmanager.enable = true;  # Easiest to use and most distros use this by default.
-
-  # Set your time zone.
-  # time.timeZone = "Europe/Amsterdam";
-
-  # Configure network proxy if necessary
-  # networking.proxy.default = "http://user:password@proxy:port/";
-  # networking.proxy.noProxy = "127.0.0.1,localhost,internal.domain";
 
   # Select internationalisation properties.
   i18n.defaultLocale = "en_US.UTF-8";
@@ -121,11 +111,24 @@ in
  
     # use the example session manager (no others are packaged yet so this is enabled by default, 
     # no need to redefine it in your config for now) 
-    #media-session.enable = true; 
-  }; 
+    media-session.enable = false; 
+    wireplumber.enable = true;
+  };
+
+  # bluetooth
+  hardware.bluetooth = {
+    enable = true;
+  };
+  services.blueman.enable = true;
+
+  services.fstrim = {
+    enable = true;
+    interval = "weekly";
+  };
 
   # Enable touchpad support (enabled default in most desktopManager).
   # services.xserver.libinput.enable = true;
+
   # nvidia setup
   boot.blacklistedKernelModules = [ "nouveau" "nvidiafb" ];
   boot.kernelPackages = pkgs.linuxPackages_latest;
@@ -173,6 +176,285 @@ in
   # network
   networking.networkmanager.enable = true;
 
+  # Define a user account. Don't forget to set a password with ‘passwd’.
+  users = {
+    users.hudson = {
+      isNormalUser = true;
+      description = "Hudson Couto";
+      createHome = true;
+      home = "/home/hudson";
+      shell = pkgs.zsh;
+      extraGroups = ["wheel" "networkmanager" "adbusers" "audio" "video" "storage" "docker"];
+      uid = 1000;
+    };
+  };
+
+  # X11/Gnome config
+  services.xserver = {
+    enable = true;
+    dpi = 110;
+
+    layout = "us";
+    xkbVariant = "intl";
+    libinput.enable = true;
+
+    displayManager = {
+      gdm.enable = true;
+      gdm.wayland = false;
+      gdm.autoSuspend = false;
+    };
+    desktopManager.gnome.enable = true;
+  };
+
+  # services
+  # Enable the OpenSSH daemon.
+  # services.openssh.enable = true;
+
+  # TODO: need to refact
+  # packages/fonts
+  # List packages installed in system profile. To search, run:
+  # $ nix search wget
+  environment.systemPackages = with pkgs; [
+    # bluetooth
+    bluez
+    bluez-tools
+    bluez-alsa
+    blueman
+
+    libsmbios
+    powertop
+    vim # Do not forget to add an editor to edit configuration.nix! The Nano editor is also installed by default.
+    wget
+    firefox
+    unzip
+    unrar
+    gitAndTools.gitFull
+    glxinfo
+    nvtop-nvidia
+    nvidia-offload
+    vlc
+    zsh
+    nix-zsh-completions
+    fasd
+    fd
+    fzf
+    tldr
+    ripgrep
+    lolcat
+    screenfetch
+    tdesktop
+    alacritty
+    neofetch
+    gimp
+    inkscape
+    blender
+    scour
+    peek
+    bat
+    bc
+    bind
+    binutils
+    cached-nix-shell
+    cachix
+    coreutils
+    direnv
+    obs-studio
+    clang
+    curl
+    dmidecode
+    exa
+    gcc
+    gnumake
+    git
+    gitAndTools.gh
+    speedtest-cli
+    jq
+    ngrok
+    file
+    htop
+    libsecret
+    libgcc
+    libgccjit
+    i7z
+    iw
+    jq
+    lm_sensors
+    netcat
+    nix-index
+    nix-tree
+    openssl
+    pkg-config
+    pciutils
+    patchelf
+    stdenv.cc.cc.lib
+    tree
+    vim
+    wget
+    zlib
+    neovim
+    todoist-electron
+    transmission
+    transmission-gtk
+    starship
+    tmux
+    wakatime
+    zoom-us
+    aspellDicts.pt_BR
+    aspellDicts.en
+    aspell
+    sd
+    silver-searcher
+    xsel
+    xclip
+    # spotify
+    spotify
+    evince
+    xournalpp
+    _1password-gui
+    lua
+    imagemagick
+    sqlite
+    glibc
+    
+    # elixir
+    elixir
+    erlang
+    rebar3
+
+    # postgres
+    # postgresql_15
+
+    # rust
+    llvm
+    rust-analyzer
+    cargo
+    rustup
+    sccache
+
+    # jdk
+    jdk
+
+    # docker
+    docker
+    docker-compose
+
+    # javascript
+    nodejs
+    nodePackages.yalc
+    nodePackages.typescript-language-server
+    nodePackages.javascript-typescript-langserver
+    nodePackages.jsonlint
+    nodePackages.yarn
+    nodePackages_latest.typescript
+
+    # libre office
+    libreoffice
+
+    # cc
+    clang
+    gcc
+    bear
+    gdb
+    cmake
+    llvmPackages.libcxx
+
+    # clojure
+    clojure
+    joker
+    leiningen
+
+    # asdf
+    asdf-vm
+
+    # boot splash
+    plymouth
+
+    # gnome extensions
+    gnomeExtensions.appindicator
+    gnomeExtensions.mpris-label
+    gnomeExtensions.no-activities-button
+
+    # steam
+    steam
+  ];
+
+  # fonts
+  fonts = {
+    fonts = with pkgs; [
+      emacs-all-the-icons-fonts
+      hack-font
+      roboto
+      roboto-mono
+      material-design-icons
+      ibm-plex
+      nerdfonts
+      dejavu_fonts
+      liberation_ttf
+      roboto
+      fira-code
+      fira-code-symbols
+      jetbrains-mono
+      siji
+      font-awesome
+      cascadia-code
+    ];
+  };
+
+  # started in user sessions.
+  # programs.mtr.enable = true;
+  # programs.gnupg.agent = {
+  #   enable = true;
+  #   enableSSHSupport = true;
+  # };
+
+  # List services that you want to enable:
+
+  # Enable the OpenSSH daemon.
+  services.openssh.enable = true;
+  environment.variables = {
+    PKG_CONFIG_PATH = "${pkgs.openssl.dev}/lib/pkgconfig";
+  };
+ 
+  # TODO: fprintd
+  # services.fprintd = {
+  #   enable = true;
+  #   package = pkgs.fprintd-tod;
+  #   tod = {
+  #     enable = true;
+  #     driver = pkgs.libfprint-2-tod1-goodix;
+  #   };
+  # };
+  # security.pam.services.login.fprintAuth = true;
+  # security.pam.services.xscreensaver.fprintAuth = true;
+
+  # postgres
+  # services.postgresql = {
+  #   enable = true;
+  #   authentication = pkgs.lib.mkForce "host all all 127.0.0.1/32 trust";
+  #   ensureUsers = [
+  #     {  name = "hudson";
+  #        ensurePermissions = { "ALL TABLES IN SCHEMA public" = "ALL PRIVILEGES"; };
+  #     }
+  #   ];
+  # };
+
+  # docker
+  virtualisation.docker = {
+    enable = true;
+    autoPrune.enable = true;
+    enableOnBoot = false;
+  };
+
+  # steam service config
+  programs.steam = {
+    enable = true;
+    remotePlay.openFirewall = true; # Open ports in the firewall for Steam Remote Play
+    dedicatedServer.openFirewall = true; # Open ports in the firewall for Source Dedicated Server
+  };
+
+  # Steam Proton Config
+  systemd.extraConfig = "DefaultLimitNOFILE=1048576";
+ 
   # enable some programs
   # programs.nm-applet.enable = true;
   programs.zsh = {
@@ -210,7 +492,7 @@ in
     };
   };
 
-  # tmux
+    # tmux
   programs.tmux = {
     enable = true;
     clock24 = true;
@@ -286,261 +568,8 @@ in
 
       set -g monitor-activity on
       set -g visual-activity off
-
-
     '';
   };
-
-  # Define a user account. Don't forget to set a password with ‘passwd’.
-  users = {
-    users.hudson = {
-      isNormalUser = true;
-      description = "Hudson Couto";
-      createHome = true;
-      home = "/home/hudson";
-      shell = pkgs.zsh;
-      extraGroups = ["wheel" "networkmanager" "adbusers" "audio" "video" "storage" "docker"];
-      uid = 1000;
-    };
-  };
-
-  # xserver/gnome config
-  services.xserver = {
-    enable = true;
-    dpi = 110;
-
-    layout = "us";
-    xkbVariant = "intl";
-    libinput.enable = true;
-
-    displayManager = {
-      gdm.enable = true;
-      gdm.wayland = false;
-      gdm.autoSuspend = false;
-    };
-    desktopManager.gnome.enable = true;
-  };
-
-  # List packages installed in system profile. To search, run:
-  # $ nix search wget
-  environment.systemPackages = with pkgs; [
-    vim # Do not forget to add an editor to edit configuration.nix! The Nano editor is also installed by default.
-    wget
-    firefox
-    unzip
-    unrar
-    gitAndTools.gitFull
-    glxinfo
-    nvtop-nvidia
-    nvidia-offload
-    vlc
-    zsh
-    nix-zsh-completions
-    fasd
-    fd
-    fzf
-    tldr
-    ripgrep
-    lolcat
-    screenfetch
-    tdesktop
-    alacritty
-    neofetch
-    gimp
-    inkscape
-    blender
-    scour
-    peek
-    bat
-    bc
-    bind
-    binutils
-    cached-nix-shell
-    cachix
-    coreutils
-    direnv
-    obs-studio
-    clang
-    curl
-    dmidecode
-    exa
-    gcc
-    gnumake
-    git
-    gitAndTools.gh
-    speedtest-cli
-    jq
-    ngrok
-    file
-    htop
-    libsecret
-    libgcc
-    libgccjit
-    i7z
-    iw
-    jq
-    lm_sensors
-    netcat
-    nix-index
-    nix-tree
-    openssl
-    pciutils
-    patchelf
-    stdenv.cc.cc.lib
-    tree
-    vim
-    wget
-    zlib
-    neovim
-    todoist-electron
-    transmission
-    transmission-gtk
-    starship
-    tmux
-    wakatime
-    zoom-us
-    aspellDicts.pt_BR
-    aspellDicts.en
-    aspell
-    sd
-    silver-searcher
-    xsel
-    xclip
-    # spotify
-    spotify
-    evince
-    xournalpp
-    _1password-gui
-    lua
-    imagemagick
-    sqlite
-    glibc
-    
-    # elixir
-    elixir
-    erlang
-    rebar3
-
-    # postgres
-    # postgresql_15
-
-    # rust
-    llvm
-    rustup
-    rust-analyzer
-    sccache
-
-    # jdk
-    jdk
-
-    # docker
-    docker
-    docker-compose
-
-    # javascript
-    nodejs
-    nodePackages.yalc
-    nodePackages.typescript-language-server
-    nodePackages.javascript-typescript-langserver
-    nodePackages.jsonlint
-    nodePackages.yarn
-    nodePackages_latest.typescript
-
-    # libre office
-    libreoffice
-
-    # cc
-    clang
-    gcc
-    bear
-    gdb
-    cmake
-    llvmPackages.libcxx
-
-    # clojure
-    clojure
-    joker
-    leiningen
-
-    # asdf
-    asdf-vm
-
-    # boot splash
-    plymouth
-
-    # gnome extensions
-    gnomeExtensions.appindicator
-    gnomeExtensions.resource-monitor
-    gnomeExtensions.mpris-label
-    gnomeExtensions.no-activities-button
-
-    # steam
-    steam
-  ];
-
-  # fonts
-  fonts = {
-    fonts = with pkgs; [
-      emacs-all-the-icons-fonts
-      hack-font
-      roboto
-      roboto-mono
-      material-design-icons
-      ibm-plex
-      nerdfonts
-      dejavu_fonts
-      liberation_ttf
-      roboto
-      fira-code
-      fira-code-symbols
-      jetbrains-mono
-      siji
-      font-awesome
-      cascadia-code
-    ];
-  };
-  # Some programs need SUID wrappers, can be configured further or are
-  # started in user sessions.
-  # programs.mtr.enable = true;
-  # programs.gnupg.agent = {
-  #   enable = true;
-  #   enableSSHSupport = true;
-  # };
-
-  # List services that you want to enable:
-
-  # Enable the OpenSSH daemon.
-  services.openssh.enable = true;
- 
-  # TODO: fprintd
-  # services.fprintd.enable = true;
-
-  # postgres
-  # services.postgresql = {
-  #   enable = true;
-  #   authentication = pkgs.lib.mkForce "host all all 127.0.0.1/32 trust";
-  #   ensureUsers = [
-  #     {  name = "hudson";
-  #        ensurePermissions = { "ALL TABLES IN SCHEMA public" = "ALL PRIVILEGES"; };
-  #     }
-  #   ];
-  # };
-
-  # docker
-  virtualisation.docker = {
-    enable = true;
-    autoPrune.enable = true;
-    enableOnBoot = false;
-  };
-
-  # steam service config
-  programs.steam = {
-    enable = true;
-    remotePlay.openFirewall = true; # Open ports in the firewall for Steam Remote Play
-    dedicatedServer.openFirewall = true; # Open ports in the firewall for Source Dedicated Server
-  };
-  # Steam Proton Config
-  systemd.extraConfig = "DefaultLimitNOFILE=1048576";
 
   # Open ports in the firewall.
   # networking.firewall.allowedTCPPorts = [ ... ];
