@@ -1,11 +1,11 @@
 # dotfiles
 
 ## TODO
-- [ ] Use home-manager
+- [X] Use home-manager
 - [ ] Use Flakes
 - [ ] Xmonad Setup
+- [ ] Hyprland setup
 - [ ] Postgres setup
-- [ ] change `ext4` to `zfs`
 
 ## Tips
 
